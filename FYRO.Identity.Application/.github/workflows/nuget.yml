@@ -1,0 +1,45 @@
+name: Publish Packages
+
+on:
+  push:
+    tags:
+    - 'v*'
+    
+  workflow_dispatch:
+
+env:
+  PACKAGE_OUTPUT_DIRECTORY: ${{ github.workspace }}/output
+  NUGET_SOURCE_URL: 'https://api.nuget.org/v3/index.json'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 6.0.*
+
+    - name: Publish Nuget
+      uses: Hammurabidoug/publish-nuget@main
+      with:
+        milliseconds: 5001
+      
+    - name: Install dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+
+    - name: 'Get Version'
+      id: version
+      uses: battila7/get-version-action@v2
+
+    - name: 'Pack FYRO.Identity.Application project'
+      run: dotnet pack src/Application/Application.csproj --no-restore --no-build --configuration Release --include-symbols -p:PackageVersion=${{ steps.version.outputs.version-without-v }} --output ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
+
+    - name: 'Push FYRO.Identity.Application package'
+      run: dotnet nuget push ${{ env.PACKAGE_OUTPUT_DIRECTORY }}/FYRO.Identity.Application.*.nupkg -k ${{ secrets.NUGET_TOKEN }} -s ${{ env.NUGET_SOURCE_URL }} --skip-duplicate
